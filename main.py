@@ -25,29 +25,29 @@ app.add_middleware(
 
 class Payload(BaseModel):
   session_id: str
-  audio_data: bytes
+  audio_data: str
   chunk_number: int
-  stream_type: Literal["chunk", "final"]
+  stream_type: str
 
 async def asking_question(session_id: str):
   identifier_current_message_id = "session:" + session_id + ":current_message_id"
-  message_id = redis_client.get(identifier_current_message_id)
+  message_id = redis_client.get(identifier_current_message_id).decode('utf-8')
 
   identifier_session = "transcription:" + session_id + ":message:" + message_id + ":chunk"
 
   identifier_process_chunk = "transcription:" + session_id + ":message:" + message_id + ":process"
-  # await until all chunks are processed
+  # block until all chunks are processed
   while redis_client.scard(identifier_process_chunk) > 0:
-    await asyncio.sleep(0.01)
+    print("waiting for all chunks to be processed")
+    await asyncio.sleep(0.1)
 
   # chunk to integer, sort, and loop through all chunks
   user_answer = ''
   for chunk_number in sorted(redis_client.smembers(identifier_session)):
-    identifier_text_chunk = "transcription:" + session_id + ":message:" + message_id + ":" + chunk_number + ":text"
-    user_answer += redis_client.get(identifier_text_chunk)
-
-  identifier_user_answer = "transcription:" + session_id + ":message:" + message_id + ":user_answer"
-  user_answer = redis_client.get(identifier_user_answer)
+    identifier_text_chunk = "transcription:" + session_id + ":message:" + message_id + ":" + chunk_number.decode('utf-8') + ":text"
+    current_chunk = redis_client.get(identifier_text_chunk)
+    if current_chunk:
+      user_answer += current_chunk.decode('utf-8')
 
   final_prompt = """
         You are an excellent interviewer. You have wide experience on interviewing candidate for 15+ years.
@@ -87,35 +87,33 @@ async def asking_question(session_id: str):
 
   redis_client.set("transcription:" + session_id + ":message:" + message_id + ":assistant_response", assistant_response)
 
-async def transcribe(audio_data: bytes, session_id: str, chunk_number: int):
+async def transcribe(audio_data: str, session_id: str, chunk_number: int):
+  identifier_current_message_id = "session:" + session_id + ":current_message_id"
+  message_id = redis_client.get(identifier_current_message_id).decode('utf-8')
+
   identifier_process_chunk = "transcription:" + session_id + ":message:" + message_id + ":process"
   redis_client.sadd(identifier_process_chunk, str(chunk_number))
-
-  identifier_current_message_id = "session:" + session_id + ":current_message_id"
-  message_id = redis_client.get(identifier_current_message_id)
 
   identifier_session = "transcription:" + session_id + ":message:" + message_id + ":chunk"
   redis_client.sadd(identifier_session, str(chunk_number))
 
-  audio_part = genai.types.Content(
-    types.Part.from_bytes(
-      data=audio_data,
-      mime_type="audio/wav"
-    )
+  audio_part = types.Part.from_bytes(
+    data=audio_data,
+    mime_type="audio/wav"
   )
 
   response =  client.models.generate_content(
     model="gemini-2.0-flash-lite",
     contents=[
-      "Transcribe the following audio data: ",
+      "Transcribe the following audio data, The Speaker will use Bahasa Indonesia or English, so you need to transcribe it in Bahasa Indonesia or English: ",
       audio_part
     ]
   )
 
   identifier_current_message_id = "session:" + session_id + ":current_message_id"
-  message_id = redis_client.get(identifier_current_message_id)
+  message_id = redis_client.get(identifier_current_message_id).decode('utf-8')
 
-  identifier_text_chunk = "transcription:" + session_id + ":message:" + message_id + str(chunk_number) + ":text"
+  identifier_text_chunk = "transcription:" + session_id + ":message:" + message_id + ":" + str(chunk_number) + ":text"
   redis_client.set(identifier_text_chunk, response.text)
   redis_client.srem(identifier_process_chunk, str(chunk_number))
 
