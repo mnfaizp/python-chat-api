@@ -13,3 +13,67 @@ services:
       context: .
     ports:
       - 8000:8000
+    environment:
+      - POSTGRES_SERVER=db
+      - POSTGRES_USER=dev
+      - POSTGRES_PASSWORD=/run/secrets/postgres_password
+      - POSTGRES_DB=rakamin_development
+      - GEMINI_API_KEY=/run/secrets/gemini_api_key
+      - OPENAI_API_KEY=/run/secrets/openai_api_key
+      - OPEN_ROUTER_API_KEY=/run/secrets/open_router_api_key
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    secrets:
+      - postgres_password
+      - gemini_api_key
+      - openai_api_key
+      - open_router_api_key
+  
+  db:
+    image: pgvector/pgvector:0.8.0-pg17
+    restart: always
+    user: postgres
+    secrets:
+      - postgres_password
+    environment:
+      - POSTGRES_PASSWORD=/run/secrets/postgres_password
+      - POSTGRES_DB=rakamin_development
+    expose:
+      - 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "dev", "-d", "rakamin_development"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+secrets:
+  postgres_password:
+    file: ./secrets/postgres_password.txt
+  gemini_api_key:
+    file: ./secrets/gemini_api_key.txt
+  openai_api_key:
+    file: ./secrets/openai_api_key.txt
+  open_router_api_key:
+    file: ./secrets/open_router_api_key.txt
