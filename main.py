@@ -1,11 +1,12 @@
 import asyncio
+import os
 
 from google import genai
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 
-client = genai.Client(api_key="")
+client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 app = FastAPI()
 
 app.add_middleware(

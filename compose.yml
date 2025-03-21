@@ -15,7 +15,7 @@ services:
       - 8000:8000
     environment:
       - POSTGRES_SERVER=db
-      - POSTGRES_USER=dev
+      - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=/run/secrets/postgres_password
       - POSTGRES_DB=rakamin_development
       - GEMINI_API_KEY=/run/secrets/gemini_api_key
@@ -33,6 +33,10 @@ services:
       - gemini_api_key
       - openai_api_key
       - open_router_api_key
+    develop:
+      watch:
+        - action: rebuild
+          path: .
   
   db:
     image: pgvector/pgvector:0.8.0-pg17
@@ -48,7 +52,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD", "pg_isready", "-U", "dev", "-d", "rakamin_development"]
+      test: ["CMD", "pg_isready", "-U", "postgres", "-d", "rakamin_development"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -56,8 +60,8 @@ services:
   redis:
     image: redis:latest
     restart: always
-    ports:
-      - 6379:6379
+    expose:
+      - 6379
     volumes:
       - redis_data:/data
     healthcheck:
@@ -71,7 +75,7 @@ volumes:
   redis_data:
 secrets:
   postgres_password:
-    file: ./secrets/postgres_password.txt
+    file: ./secrets/postgress_password.txt
   gemini_api_key:
     file: ./secrets/gemini_api_key.txt
   openai_api_key:
