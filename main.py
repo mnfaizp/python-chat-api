@@ -1,5 +1,4 @@
 import os
-from typing import Literal
 
 from google import genai
 from google.genai import types
@@ -7,11 +6,18 @@ from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from openai import OpenAI
+from dotenv import load_dotenv
 import asyncio
 import redis
 import uuid
+import json
+
+load_dotenv()
 
 client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 app = FastAPI()
 redis_client = redis.Redis(host="localhost", port=6379, db=0)
 
@@ -74,16 +80,45 @@ async def asking_question(session_id: str):
   """
 
   assistant_response = ''
-  for chunk in client.models.generate_content_stream(
-    model="gemini-2.0-flash-lite",
-    config= genai.types.GenerateContentConfig(
-      system_instruction=final_prompt
-    ),
-    contents=["Here is the candidate answer: " + user_answer]
-  ):
-    await asyncio.sleep(0.01)
-    assistant_response += chunk.text
-    yield f"data: {chunk.text} \n\n"
+  stream = openai_client.chat.completions.create(
+    model="gpt-4o-mini-audio-preview",
+    modalities=["text", "audio"],
+    audio={
+      "voice": "alloy",
+      "format": "pcm16"
+    },
+    messages=[
+      {"role": "system", "content": final_prompt},
+      {"role": "user", "content": "Here is the candidate answer: " + user_answer}
+    ],
+    stream=True
+  )
+  
+  for chunk in stream:   
+    await asyncio.sleep(0.05)
+
+    # Check if delta exists and has audio attribute
+    if not hasattr(chunk.choices[0].delta, 'audio') or chunk.choices[0].delta.audio is None:
+      continue
+    
+    audio = chunk.choices[0].delta.audio
+    # Check for transcript
+    if 'transcript' in audio and audio['transcript'] is not None:
+      assistant_response += audio['transcript']
+      output = {
+        "type": "text",
+        "content": audio['transcript']
+      }
+      yield f"data: {json.dumps(output)} \n\n"
+
+    # Check for audio data
+    if 'data' in audio and audio['data'] is not None:
+      output = {
+        "type": "audio",
+        "content": audio['data']
+      }
+
+      yield f"data: {json.dumps(output)} \n\n"
 
   redis_client.set("transcription:" + session_id + ":message:" + message_id + ":assistant_response", assistant_response)
 
