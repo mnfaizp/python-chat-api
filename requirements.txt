@@ -8,6 +8,8 @@ charset-normalizer==3.4.1
 click==8.1.8
 distro==1.9.0
 dnspython==2.7.0
+dotenv==0.9.9
+elevenlabs==1.54.0
 email_validator==2.2.0
 fastapi==0.115.11
 fastapi-cli==0.0.7
