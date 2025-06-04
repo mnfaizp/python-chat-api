@@ -90,10 +90,10 @@ class AudioPayload(BaseModel):
     session_id: str = Field(..., min_length=1, max_length=100, description="Session identifier")
     audio_data: str = Field(..., min_length=1, description="Base64 encoded audio data")
     chunk_number: int = Field(..., ge=0, le=10000, description="Chunk sequence number")
-    stream_type: str = Field(..., regex="^(chunk|question)$", description="Type of stream processing")
+    stream_type: str = Field(..., description="Type of stream processing")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "session_id": "123e4567-e89b-12d3-a456-426614174000",
                 "audio_data": "UklGRnoGAABXQVZFZm10IBAAAAABAAEA...",
@@ -111,7 +111,7 @@ class SessionResponse(BaseModel):
     session_id: str = Field(..., description="Unique session identifier")
 
     class Config:
-        schema_extra = {
+        json_schema_extra = {
             "example": {
                 "session_id": "123e4567-e89b-12d3-a456-426614174000"
             }
@@ -186,9 +186,6 @@ async def start_session() -> SessionResponse:
     except Exception as e:
         logger.error(f"Error creating session: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create session")
-
-
-
 
 
 @app.get("/health", summary="Health check")

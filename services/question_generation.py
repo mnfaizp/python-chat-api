@@ -92,49 +92,49 @@ class QuestionGeneration:
             logger.error(f"Error generating questions for session {session_id}: {str(e)}")
             raise Exception(f"Question generation failed: {str(e)}")
     
-  async def understand_speech_4o_mini_audio(self, user_answer: str, system_prompt: str, session_id: str, message_id: str):
-    assistant_response = ''
-    stream = self.openai_client.chat.completions.create(
-      model="gpt-4o-mini-audio-preview",
-      modalities=["text", "audio"],
-      audio={
-        "voice": "onyx",
-        "format": "pcm16"
-      },
-      messages=[
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": "Here is the candidate answer: " + user_answer}
-      ],
-      stream=True
-    )
-    
-    for chunk in stream:   
-      await asyncio.sleep(0.01)
+    async def understand_speech_4o_mini_audio(self, user_answer: str, system_prompt: str, session_id: str, message_id: str):
+        assistant_response = ''
+        stream = self.openai_client.chat.completions.create(
+        model="gpt-4o-mini-audio-preview",
+        modalities=["text", "audio"],
+        audio={
+            "voice": "onyx",
+            "format": "pcm16"
+        },
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": "Here is the candidate answer: " + user_answer}
+        ],
+        stream=True
+        )
+        
+        for chunk in stream:   
+            await asyncio.sleep(0.01)
 
-      # Check if delta exists and has audio attribute
-      if not hasattr(chunk.choices[0].delta, 'audio') or chunk.choices[0].delta.audio is None:
-        continue
-      
-      audio = chunk.choices[0].delta.audio
-      # Check for transcript
-      if 'transcript' in audio and audio['transcript'] is not None:
-        assistant_response += audio['transcript']
-        output = {
-          "type": "text",
-          "content": audio['transcript']
-        }
-        yield f"data: {json.dumps(output)} \n\n"
+            # Check if delta exists and has audio attribute
+            if not hasattr(chunk.choices[0].delta, 'audio') or chunk.choices[0].delta.audio is None:
+                continue
+            
+            audio = chunk.choices[0].delta.audio
+            # Check for transcript
+            if 'transcript' in audio and audio['transcript'] is not None:
+                assistant_response += audio['transcript']
+                output = {
+                "type": "text",
+                "content": audio['transcript']
+                }
+                yield f"data: {json.dumps(output)} \n\n"
 
-      # Check for audio data
-      if 'data' in audio and audio['data'] is not None:
-        output = {
-          "type": "audio",
-          "content": audio['data']
-        }
+            # Check for audio data
+            if 'data' in audio and audio['data'] is not None:
+                output = {
+                "type": "audio",
+                "content": audio['data']
+                }
 
-        yield f"data: {json.dumps(output)} \n\n"
+                yield f"data: {json.dumps(output)} \n\n"
 
-    self.redis_client.set("transcription:" + session_id + ":message:" + message_id + ":assistant_response", assistant_response)
+            self.redis_client.set("transcription:" + session_id + ":message:" + message_id + ":assistant_response", assistant_response)
     
     async def understand_gemini_speech_elevenlabs(
         self, user_answer: str, system_prompt: str, session_id: str, message_id: str

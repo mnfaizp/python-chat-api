@@ -3,8 +3,8 @@ Application settings and configuration management.
 """
 import os
 from typing import List, Optional
-from pydantic_settings import BaseSettings
-from pydantic import Field, validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, field_validator
 
 
 class Settings(BaseSettings):
@@ -18,10 +18,7 @@ class Settings(BaseSettings):
     port: int = Field(default=8000, env="PORT")
     
     # Security
-    allowed_origins: List[str] = Field(
-        default=["http://localhost:3000", "http://localhost:8080"], 
-        env="ALLOWED_ORIGINS"
-    )
+    allowed_origins: str = "*"
     secret_key: str = Field(default="your-secret-key-change-in-production", env="SECRET_KEY")
     
     # Database Configuration
@@ -41,8 +38,9 @@ class Settings(BaseSettings):
     elevenlabs_api_key: str = Field(..., env="ELEVEN_LABS_API_KEY")
     open_router_api_key: Optional[str] = Field(default=None, env="OPEN_ROUTER_API_KEY")
     
-    # Audio Processing
+    # Audio/Video Processing
     max_audio_chunk_size: int = Field(default=25 * 1024 * 1024, env="MAX_AUDIO_CHUNK_SIZE")  # 25MB
+    max_video_size: int = Field(default=100 * 1024 * 1024, env="MAX_VIDEO_SIZE")  # 100MB
     temp_dir: str = Field(default="./tmp", env="TEMP_DIR")
     
     # Session Configuration
@@ -53,14 +51,25 @@ class Settings(BaseSettings):
     log_level: str = Field(default="INFO", env="LOG_LEVEL")
     log_file: Optional[str] = Field(default=None, env="LOG_FILE")
     
-    @validator("allowed_origins", pre=True)
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+
+    @field_validator("redis_password", mode="before")
+    @classmethod
+    def parse_redis_password(cls, v):
+        """Handle empty redis password."""
+        if isinstance(v, str) and not v.strip():
+            return None
         return v
-    
-    @validator("log_level")
+
+    @field_validator("log_file", mode="before")
+    @classmethod
+    def parse_log_file(cls, v):
+        """Handle empty log file."""
+        if isinstance(v, str) and not v.strip():
+            return None
+        return v
+
+    @field_validator("log_level")
+    @classmethod
     def validate_log_level(cls, v):
         """Validate log level."""
         valid_levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -68,10 +77,11 @@ class Settings(BaseSettings):
             raise ValueError(f"Log level must be one of: {valid_levels}")
         return v.upper()
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False
+    )
 
 
 # Global settings instance
