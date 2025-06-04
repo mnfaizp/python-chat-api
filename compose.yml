@@ -14,15 +14,27 @@ services:
     ports:
       - 8000:8000
     environment:
+      # Database configuration
       - POSTGRES_SERVER=db
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=/run/secrets/postgres_password
       - POSTGRES_DB=rakamin_development
+
+      # AI service API keys
       - GEMINI_API_KEY=/run/secrets/gemini_api_key
       - OPENAI_API_KEY=/run/secrets/openai_api_key
+      - ELEVEN_LABS_API_KEY=/run/secrets/elevenlabs_api_key
       - OPEN_ROUTER_API_KEY=/run/secrets/open_router_api_key
+
+      # Redis configuration
       - REDIS_HOST=redis
       - REDIS_PORT=6379
+      - REDIS_DB=0
+
+      # Application configuration
+      - DEBUG=false
+      - LOG_LEVEL=INFO
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:8080
     depends_on:
       db:
         condition: service_healthy
@@ -32,6 +44,7 @@ services:
       - postgres_password
       - gemini_api_key
       - openai_api_key
+      - elevenlabs_api_key
       - open_router_api_key
     develop:
       watch:
@@ -80,5 +93,7 @@ secrets:
     file: ./secrets/gemini_api_key.txt
   openai_api_key:
     file: ./secrets/openai_api_key.txt
+  elevenlabs_api_key:
+    file: ./secrets/elevenlabs_api_key.txt
   open_router_api_key:
     file: ./secrets/open_router_api_key.txt

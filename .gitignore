@@ -54,3 +54,7 @@ env.bak/
 venv.bak/
 
 secrets/
+
+tmp/*
+data/*
+experiments/*
